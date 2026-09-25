@@ -1,0 +1,85 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >
+  DevOpsGPT Tenant Onboarding — creates a cross-account read-only IAM role
+  that allows the DevOpsGPT master account to monitor your infrastructure.
+
+Parameters:
+  DevOpsGPTMasterAccountId:
+    Type: String
+    Description: AWS Account ID of the DevOpsGPT master account
+    Default: '649536287899'
+
+  TenantId:
+    Type: String
+    Description: Your DevOpsGPT tenant ID (pre-filled automatically)
+
+Resources:
+
+  DevOpsGPTRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: DevOpsGPTMonitorRole
+      Description: >
+        Read-only cross-account role for DevOpsGPT to monitor your
+        EC2, CloudWatch, and CloudTrail resources.
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              AWS: !Sub 'arn:aws:iam::${DevOpsGPTMasterAccountId}:role/devopsgpt-dev-lambda-role'
+            Action: sts:AssumeRole
+            Condition:
+              StringEquals:
+                sts:ExternalId: !Ref TenantId
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/ReadOnlyAccess
+      Policies:
+        - PolicyName: DevOpsGPTMinimalAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Sid: EC2ReadOnly
+                Effect: Allow
+                Action:
+                  - ec2:Describe*
+                  - ec2:Get*
+                  - ec2:List*
+                Resource: '*'
+              - Sid: CloudWatchReadOnly
+                Effect: Allow
+                Action:
+                  - cloudwatch:Describe*
+                  - cloudwatch:Get*
+                  - cloudwatch:List*
+                  - logs:Describe*
+                  - logs:Get*
+                  - logs:Filter*
+                  - logs:StartQuery
+                  - logs:StopQuery
+                  - logs:TestMetricFilter
+                Resource: '*'
+              - Sid: SSMReadOnly
+                Effect: Allow
+                Action:
+                  - ssm:Describe*
+                  - ssm:Get*
+                  - ssm:List*
+                Resource: '*'
+      Tags:
+        - Key: ManagedBy
+          Value: DevOpsGPT
+        - Key: TenantId
+          Value: !Ref TenantId
+
+Outputs:
+  RoleArn:
+    Description: >
+      Copy this value and paste it into the DevOpsGPT app to complete setup.
+    Value: !GetAtt DevOpsGPTRole.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-RoleArn'
+
+  RoleName:
+    Description: Name of the created IAM role
+    Value: !Ref DevOpsGPTRole
